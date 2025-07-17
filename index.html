@@ -1,0 +1,232 @@
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+
+export default function RevenueRecoveryCalculator() {
+  const steps = [
+    "inspectionsPerMonth",
+    "deficienciesPerInspection",
+    "quoteRate",
+    "avgQuoteValue",
+    "coldQuoteRate",
+    "followUpWinRate",
+    "results",
+    "summary",
+  ];
+
+  const [step, setStep] = useState(0);
+  const [inputs, setInputs] = useState({
+    inspectionsPerMonth: "100",
+    deficienciesPerInspection: "3",
+    quoteRate: "60",
+    avgQuoteValue: "750",
+    coldQuoteRate: "40",
+    followUpWinRate: "50",
+    toolCost: 499,
+  });
+  const [results, setResults] = useState(null);
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef();
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const parseInput = (value) => {
+    if (typeof value === "string" && value.includes("-")) {
+      const [min, max] = value.split("-").map((v) => parseInt(v, 10));
+      return { min, max, avg: Math.round((min + max) / 2) };
+    }
+    const val = Number(value);
+    return { min: val, max: val, avg: val };
+  };
+
+  const nextStep = () => {
+    if (step < steps.length - 1) {
+      setStep(step + 1);
+    } else {
+      setStep(step + 1);
+    }
+  };
+
+  const handleChange = (name, value) => {
+    setInputs({ ...inputs, [name]: value });
+  };
+
+  const calculate = () => {
+    const i = parseInput(inputs.inspectionsPerMonth);
+    const d = parseInput(inputs.deficienciesPerInspection);
+    const q = parseInput(inputs.quoteRate);
+    const v = parseInput(inputs.avgQuoteValue);
+    const c = parseInput(inputs.coldQuoteRate);
+    const w = parseInput(inputs.followUpWinRate);
+    const cost = Number(inputs.toolCost);
+
+    const computeRevenue = (metric) => {
+      const totalDeficiencies = i[metric] * d[metric];
+      const quoted = totalDeficiencies * (q[metric] / 100);
+      const coldQuotes = quoted * (c[metric] / 100);
+      const recoveredQuotes = coldQuotes * (w[metric] / 100);
+      const recoveredRevenue = recoveredQuotes * v[metric];
+      const netProfit = recoveredRevenue - cost;
+      const breakEvenDays = Math.ceil((cost / recoveredRevenue) * 30);
+      return { recoveredRevenue, netProfit, breakEvenDays };
+    };
+
+    setResults({
+      min: computeRevenue("min"),
+      max: computeRevenue("max"),
+      avg: computeRevenue("avg"),
+    });
+  };
+
+  const fields = {
+    inspectionsPerMonth: {
+      label: "How many inspections do you perform monthly?",
+      tooltip: "Most fire safety companies conduct between 50–150 inspections per month.",
+      options: ["1-20", "21-40", "41-60", "61-80", "81-100", "101-150", "151-200"],
+      insight:
+        "🔥 Based on Zenfire records, companies performing 100+ inspections find 3+ deficiencies per inspection, yet miss out quoting over 40% of them. That's pure revenue left on the table.",
+    },
+    deficienciesPerInspection: {
+      label: "How many deficiencies do you typically find per inspection?",
+      tooltip: "Industry average ranges from 2 to 5 deficiencies per inspection.",
+      options: ["1", "2", "3", "4", "5"],
+      insight:
+        "💡 The more deficiencies you find and quote, the more you earn. But most teams only quote 60% of what they discover due to paperwork overload.",
+    },
+    quoteRate: {
+      label: "What % of deficiencies do you actually quote for?",
+      tooltip: "Many firms quote for only 50–70% due to time constraints.",
+      options: ["0-20", "21-40", "41-60", "61-80", "81-100"],
+      insight:
+        "📉 If you're quoting under 70%, Zenfire helps you quote *everything* — with instant estimates and automated tracking.",
+    },
+    avgQuoteValue: {
+      label: "What's your average quote value ($)?",
+      tooltip: "Most service quotes range from $500 to $1500.",
+      options: ["0-500", "501-750", "751-1000", "1001-1250", "1251-1500"],
+      insight:
+        "💰 Every missed quote isn’t just lost time — it’s $750+ walking away. Multiply that by dozens every month.",
+    },
+    coldQuoteRate: {
+      label: "What % of your quotes go cold due to no follow-up?",
+      tooltip: "40% of quotes never convert — just because no one followed up.",
+      options: ["0-20", "21-40", "41-60", "61-80", "81-100"],
+      insight:
+        "📪 Following up could turn dead quotes into live jobs. Zenfire auto-follows so no quote ever dies quietly.",
+    },
+    followUpWinRate: {
+      label: "If followed up, what % of cold quotes actually convert?",
+      tooltip: "Follow-up win rates can be 30–60%.",
+      options: ["0-20", "21-40", "41-60", "61-80", "81-100"],
+      insight:
+        "📈 Even a 50% win rate on cold quotes can revive thousands in revenue. Let Zenfire handle that for you — on autopilot.",
+    },
+  };
+
+  const currentKey = steps[step];
+  const current = fields[currentKey];
+
+  return (
+    <div className="min-h-screen bg-[#0f0f11] text-white flex items-center justify-center px-4 py-10">
+      <Card className="w-full max-w-xl bg-[#1c1c20] p-8 rounded-2xl shadow-2xl">
+        <CardContent className="flex flex-col gap-6 items-center">
+          {currentKey !== "results" && currentKey !== "summary" ? (
+            <>
+              <h2 className="text-2xl font-bold text-pink-400 text-center drop-shadow">
+                {current.label}
+              </h2>
+              <p className="text-sm text-gray-400 text-center">💡 {current.tooltip}</p>
+              <div className="w-full relative" ref={dropdownRef}>
+                <Input
+                  type="text"
+                  value={inputs[currentKey]}
+                  onChange={(e) => handleChange(currentKey, e.target.value)}
+                  onFocus={() => setOpen(true)}
+                  className="w-full bg-[#2a2a30] border border-gray-600 text-white"
+                />
+                {open && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-600 rounded-md shadow-xl max-h-60 overflow-auto">
+                    {current.options.map((option) => (
+                      <div
+                        key={option}
+                        className="px-4 py-2 hover:bg-pink-500 hover:text-white text-black cursor-pointer text-sm"
+                        onClick={() => {
+                          handleChange(currentKey, option);
+                          setOpen(false);
+                        }}
+                      >
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-300 text-center mt-2 italic">{current.insight}</p>
+              <Button
+                onClick={() => {
+                  setOpen(false);
+                  if (currentKey === "followUpWinRate") calculate();
+                  nextStep();
+                }}
+                className="bg-pink-500 hover:bg-pink-600 text-white text-lg py-2 px-6 rounded-xl shadow-md mt-4"
+              >
+                Next ➡️
+              </Button>
+            </>
+          ) : currentKey === "results" ? (
+            <div className="text-center space-y-4 bg-[#121212] text-white rounded-xl p-6 shadow-lg border border-pink-400">
+              <h2 className="text-3xl font-bold text-pink-500">📊 Revenue Recovery Projection</h2>
+              <p className="text-xl font-bold">
+                Recovered Revenue: <span className="text-green-400">${results?.min.recoveredRevenue.toLocaleString()} – ${results?.max.recoveredRevenue.toLocaleString()}</span>
+              </p>
+              <p className="text-xl font-bold">
+                Profit After Zenfire: <span className="text-green-400">${results?.min.netProfit.toLocaleString()} – ${results?.max.netProfit.toLocaleString()}</span>
+              </p>
+              <p className="text-lg text-blue-400">
+                ⏱ Break-even in {results?.min.breakEvenDays}–{results?.max.breakEvenDays} days.
+              </p>
+              <Button onClick={() => setStep(step + 1)} className="mt-4 bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 text-lg rounded-xl shadow">
+                See Why This Matters →
+              </Button>
+            </div>
+          ) : (
+            <div className="text-left space-y-4 bg-[#1c1c20] text-white rounded-xl p-6 shadow-xl border border-pink-600">
+              <h2 className="text-3xl font-bold text-pink-400">🚨 Final Takeaway</h2>
+              <p className="text-lg font-semibold text-gray-300">
+                If you're not using Zenfire, you're *bleeding* revenue every month. Every unquoted deficiency, every cold lead ignored — it's costing you real dollars. Meanwhile, your competitors are automating their follow-ups, quoting faster, and winning jobs you should’ve had.
+              </p>
+              <p className="text-lg text-red-400 font-bold italic">
+                ❌ Ignoring this tool could be the most expensive mistake you make this year.
+              </p>
+              <p className="text-lg font-bold text-green-400">
+                ✅ Zenfire doesn’t just pay for itself — it multiplies your ROI.
+              </p>
+              <Button className="mt-6 bg-green-500 hover:bg-green-600 text-white text-lg px-6 py-2 rounded-xl shadow-xl">
+                Book a Demo Now →
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
